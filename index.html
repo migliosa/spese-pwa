@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14532d">
+<title>Spese</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#f6f7f4; --card:#ffffff; --ink:#1c1f1a; --muted:#6b7066; --line:#dfe2da;
+  --accent:#14532d; --accent-ink:#ffffff; --soft:#e8f0e9; --warn:#a1301f; --flash:#1e3a8a; --flash-soft:#e6ebf7;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#111410; --card:#1b1f19; --ink:#e8ebe4; --muted:#9aa093; --line:#2c3229;
+    --accent:#4ade80; --accent-ink:#0b1a10; --soft:#1f2d22; --warn:#f08a7a; --flash:#93b4ff; --flash-soft:#1c2438; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+body{padding:env(safe-area-inset-top) 0 calc(76px + env(safe-area-inset-bottom))}
+main{max-width:560px;margin:0 auto;padding:12px 16px}
+h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 2px 8px;font-weight:600}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+.hidden{display:none!important}
+
+/* importo */
+.amount{display:flex;align-items:baseline;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 18px}
+.amount span{font-size:28px;color:var(--muted)}
+.amount input{border:0;padding:0;font-size:44px;font-weight:650;font-variant-numeric:tabular-nums;background:transparent;outline:none}
+
+/* conti */
+.accounts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.acc{padding:16px;border-radius:14px;border:2px solid var(--line);background:var(--card);font-weight:650;font-size:18px}
+.acc[aria-pressed=true][data-c=CASSA]{border-color:var(--accent);background:var(--soft)}
+.acc[aria-pressed=true][data-c=FLASH]{border-color:var(--flash);background:var(--flash-soft)}
+
+/* dettagli */
+details{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:14px}
+summary{padding:12px 14px;color:var(--muted);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary b{color:var(--ink);font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 14px 14px}
+.grid2 .full{grid-column:1/-1}
+label small{display:block;color:var(--muted);font-size:12px;margin:0 0 4px 2px}
+
+/* categorie */
+.cats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 12px;text-align:left;min-height:56px}
+.cat:active{transform:scale(.98)}
+.cat .p{display:block;font-size:11px;color:var(--muted)}
+.cat.more{color:var(--muted);text-align:center}
+.search{margin-bottom:8px}
+
+/* coda */
+.queue{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 14px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .imp{font-weight:650;font-variant-numeric:tabular-nums;text-align:right}
+.row .sub{grid-column:1/-1;font-size:13px;color:var(--muted)}
+.row .acts{grid-column:1/-1;display:flex;gap:14px;margin-top:4px}
+.row .acts button{font-size:14px;color:var(--accent);padding:4px 0}
+.row .acts .del{color:var(--warn)}
+.tag{font-size:11px;font-weight:700;padding:2px 6px;border-radius:6px;margin-right:6px}
+.tag.CASSA{background:var(--soft);color:var(--accent)}
+.tag.FLASH{background:var(--flash-soft);color:var(--flash)}
+.empty{padding:18px 14px;color:var(--muted)}
+.totals{display:flex;gap:16px;padding:10px 2px;color:var(--muted);font-size:14px}
+
+/* barra */
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.bar .in{max-width:560px;margin:0 auto;display:flex;gap:10px}
+.btn{flex:1;padding:14px;border-radius:12px;font-weight:650;text-align:center}
+.btn.pri{background:var(--accent);color:var(--accent-ink)}
+.btn.sec{border:1px solid var(--line)}
+.btn:disabled{opacity:.45}
+
+.toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;display:flex;gap:14px;align-items:center;
+  box-shadow:0 6px 20px rgba(0,0,0,.2);max-width:calc(100% - 32px)}
+.toast button{color:var(--bg);font-weight:700;text-decoration:underline}
+.editing{background:var(--soft);border-radius:10px;padding:8px 12px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.note{font-size:13px;color:var(--muted);margin:8px 2px}
+textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--card);color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+  <div class="amount">
+    <span>€</span>
+    <input id="imp" inputmode="decimal" autocomplete="off" placeholder="0,00" aria-label="Importo">
+  </div>
+
+  <div class="accounts" role="group" aria-label="Conto">
+    <button class="acc" data-c="CASSA" aria-pressed="false">Cassa</button>
+    <button class="acc" data-c="FLASH" aria-pressed="false">FLASH</button>
+  </div>
+
+  <div id="editbar" class="editing hidden"><span>Modifica di una spesa in coda</span><button id="canceledit">Annulla</button></div>
+
+  <details id="det">
+    <summary><span id="detsum">Oggi · nessun beneficiario</span> &nbsp;<b>Dettagli</b></summary>
+    <div class="grid2">
+      <label><small>Data</small><input id="data" type="date"></label>
+      <label><small>Ora</small><input id="ora" type="time"></label>
+      <label class="full"><small>Beneficiario (facoltativo)</small><input id="ben" list="benlist" autocomplete="off"></label>
+      <label class="full"><small>Nota (facoltativa)</small><input id="nota" autocomplete="off"></label>
+    </div>
+  </details>
+  <datalist id="benlist"></datalist>
+
+  <h2>Categoria</h2>
+  <input id="q" class="search hidden" placeholder="Cerca categoria" autocomplete="off">
+  <div id="cats" class="cats"></div>
+
+  <h2>Da inviare</h2>
+  <div id="queue" class="queue"></div>
+  <div id="totals" class="totals"></div>
+
+  <h2>Elenchi</h2>
+  <p class="note" id="elinfo"></p>
+  <details>
+    <summary><b>Carica elenchi da JSON</b></summary>
+    <div style="padding:0 14px 14px">
+      <textarea id="eljson" placeholder='{"categorie":[...],"beneficiari":[...]}'></textarea>
+      <button class="btn sec" id="elload" style="width:100%;margin-top:8px">Carica</button>
+    </div>
+  </details>
+  <p class="note" id="ver"></p>
+</main>
+
+<div class="bar"><div class="in">
+  <button class="btn pri" id="send" disabled>Invia</button>
+</div></div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+'use strict';
+const VERSIONE = '0.1 (06/11/2026)';
+const CONTI = ['CASSA','FLASH'];
+const NOME_CONTO = {CASSA:'Cassa', FLASH:'FLASH'};
+const K = {coda:'spese.coda', elenchi:'spese.elenchi', ultimo:'spese.ultimoConto'};
+
+// Elenchi di prova finche' non arriva elenchi.json da spese-dati (passo 2).
+const ELENCHI_PROVA = {
+  prova: true,
+  categorie: [
+    {nome:'Colazione, caffè', uso:{CASSA:20, FLASH:90}},
+    {nome:'Alimentari e varie', uso:{CASSA:15, FLASH:30}},
+    {nome:'Discoteca, pub, bar', uso:{CASSA:25, FLASH:20}},
+    {nome:'Donazioni', uso:{CASSA:10}},
+    {nome:'Riparazioni', uso:{CASSA:8}},
+    {nome:'Parcheggio', uso:{CASSA:7}},
+    {nome:'Regali', uso:{CASSA:6}},
+    {nome:'Abb. servizi', uso:{FLASH:12}},
+    {nome:'Servizi Internet', uso:{FLASH:10}},
+    {nome:'Ristorante', uso:{FLASH:9}},
+    {nome:'Medicine e cure', uso:{FLASH:8}}
+  ],
+  beneficiari: []
+};
+
+// ---------- archivio (localStorage protetto) ----------
+function leggi(k, def){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; }catch(e){ return def; } }
+function scrivi(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ avviso('Salvataggio non riuscito sul telefono'); return false; } }
+
+let coda = leggi(K.coda, []);
+let elenchi = leggi(K.elenchi, null) || ELENCHI_PROVA;
+let conto = leggi(K.ultimo, 'FLASH');
+let inModifica = null;      // id della spesa in modifica
+let tutteCat = false;
+
+const $ = s => document.querySelector(s);
+const fmt = n => n.toLocaleString('it-IT',{minimumFractionDigits:2, maximumFractionDigits:2});
+
+// ---------- data e ora ----------
+const due = n => String(n).padStart(2,'0');
+function oraLocale(d){ return `${due(d.getHours())}:${due(d.getMinutes())}`; }
+function dataLocale(d){ return `${d.getFullYear()}-${due(d.getMonth()+1)}-${due(d.getDate())}`; }
+function nuovoId(d){
+  const r = Array.from(crypto.getRandomValues(new Uint8Array(2)), b => b.toString(16).padStart(2,'0')).join('');
+  return `${dataLocale(d)}T${oraLocale(d)}:${due(d.getSeconds())}-${r}`;
+}
+function adesso(){ const d = new Date(); $('#data').value = dataLocale(d); $('#ora').value = oraLocale(d); }
+
+// ---------- importo ----------
+function leggiImporto(){
+  let t = $('#imp').value.trim().replace(/\s/g,'');
+  if (!t) return null;
+  if (t.includes(',')) t = t.replace(/\./g,'').replace(',', '.');   // 1.234,50 -> 1234.50
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return NaN;
+  const n = Math.round(parseFloat(t)*100)/100;
+  return n > 0 ? n : NaN;
+}
+
+// ---------- disegno ----------
+function disegnaConti(){
+  document.querySelectorAll('.acc').forEach(b => b.setAttribute('aria-pressed', b.dataset.c === conto));
+}
+
+function categorieOrdinate(){
+  return elenchi.categorie.slice().sort((a,b) =>
+    ((b.uso||{})[conto]||0) - ((a.uso||{})[conto]||0) || a.nome.localeCompare(b.nome,'it'));
+}
+function spezza(nome){ const i = nome.indexOf(':'); return i < 0 ? {p:'', s:nome} : {p:nome.slice(0,i), s:nome.slice(i+1)}; }
+
+function disegnaCategorie(){
+  const q = $('#q').value.trim().toLowerCase();
+  let lista = categorieOrdinate();
+  if (q) lista = lista.filter(c => c.nome.toLowerCase().includes(q));
+  else if (!tutteCat) lista = lista.filter(c => ((c.uso||{})[conto]||0) > 0).slice(0, 8);
+  const box = $('#cats'); box.innerHTML = '';
+  for (const c of lista){
+    const b = document.createElement('button'); b.className = 'cat';
+    const {p, s} = spezza(c.nome);
+    b.innerHTML = (p ? `<span class="p"></span>` : '') + `<span class="s"></span>`;
+    if (p) b.querySelector('.p').textContent = p;
+    b.querySelector('.s').textContent = s;
+    b.onclick = () => aggiungi(c.nome);
+    box.appendChild(b);
+  }
+  if (!q && !tutteCat){
+    const m = document.createElement('button'); m.className = 'cat more'; m.textContent = 'Altre…';
+    m.onclick = () => { tutteCat = true; $('#q').classList.remove('hidden'); $('#q').focus(); disegnaCategorie(); };
+    box.appendChild(m);
+  }
+}
+
+function disegnaBeneficiari(){
+  const dl = $('#benlist'); dl.innerHTML = '';
+  const lista = (elenchi.beneficiari||[]).slice().sort((a,b) =>
+    ((b.uso||{})[conto]||0) - ((a.uso||{})[conto]||0) || a.nome.localeCompare(b.nome,'it'));
+  for (const x of lista){ const o = document.createElement('option'); o.value = x.nome; dl.appendChild(o); }
+}
+
+function disegnaDettagli(){
+  const oggi = dataLocale(new Date());
+  const d = $('#data').value;
+  const quando = d === oggi ? 'Oggi' : d.split('-').reverse().join('/');
+  const ben = $('#ben').value.trim();
+  $('#detsum').textContent = `${quando} ${$('#ora').value} · ${ben || 'nessun beneficiario'}`;
+}
+
+function disegnaCoda(){
+  const box = $('#queue'); box.innerHTML = '';
+  if (!coda.length){ box.innerHTML = '<div class="empty">Nessuna spesa in coda.</div>'; }
+  for (const s of coda.slice().reverse()){
+    const r = document.createElement('div'); r.className = 'row';
+    r.innerHTML = `<div><span class="tag"></span><span class="c"></span></div><div class="imp"></div>
+      <div class="sub"></div>
+      <div class="acts"><button class="ed">Modifica</button><button class="del">Elimina</button></div>`;
+    r.querySelector('.tag').classList.add(s.conto);
+    r.querySelector('.tag').textContent = NOME_CONTO[s.conto];
+    r.querySelector('.c').textContent = spezza(s.categoria).s;
+    r.querySelector('.imp').textContent = fmt(s.importo) + ' €';
+    const extra = [s.data.split('-').reverse().join('/') + ' ' + (s.ora||''), s.beneficiario, s.nota].filter(Boolean).join(' · ');
+    r.querySelector('.sub').textContent = extra;
+    r.querySelector('.ed').onclick = () => modifica(s.id);
+    r.querySelector('.del').onclick = () => elimina(s.id);
+    box.appendChild(r);
+  }
+  const tot = {}; coda.forEach(s => tot[s.conto] = (tot[s.conto]||0) + s.importo);
+  $('#totals').textContent = coda.length
+    ? `${coda.length} ${coda.length===1?'spesa':'spese'} · ` + CONTI.filter(c => tot[c]).map(c => `${NOME_CONTO[c]} ${fmt(tot[c])} €`).join(' · ')
+    : '';
+  $('#send').disabled = !coda.length;
+  $('#send').textContent = coda.length ? `Invia (${coda.length})` : 'Invia';
+}
+
+function disegnaElenchi(){
+  $('#elinfo').textContent = elenchi.prova
+    ? 'Elenchi di prova (le categorie più usate dal progetto). Quelli veri arrivano da spese-dati al passo 2.'
+    : `${elenchi.categorie.length} categorie, ${(elenchi.beneficiari||[]).length} beneficiari` + (elenchi.generato ? ` · generati il ${elenchi.generato}` : '');
+}
+
+function tutto(){ disegnaConti(); disegnaCategorie(); disegnaBeneficiari(); disegnaDettagli(); disegnaCoda(); disegnaElenchi(); }
+
+// ---------- azioni ----------
+let timerToast;
+function avviso(testo, azione, fn){
+  const t = $('#toast'); t.innerHTML = ''; t.append(document.createTextNode(testo));
+  if (azione){ const b = document.createElement('button'); b.textContent = azione; b.onclick = () => { fn(); t.classList.add('hidden'); }; t.appendChild(b); }
+  t.classList.remove('hidden'); clearTimeout(timerToast); timerToast = setTimeout(() => t.classList.add('hidden'), 4000);
+}
+
+function pulisciForm(){
+  $('#imp').value = ''; $('#ben').value = ''; $('#nota').value = ''; $('#q').value = '';
+  $('#q').classList.add('hidden'); tutteCat = false; inModifica = null;
+  $('#editbar').classList.add('hidden'); $('#det').open = false; adesso();
+}
+
+function aggiungi(categoria){
+  const imp = leggiImporto();
+  if (imp === null){ avviso('Scrivi prima l’importo'); $('#imp').focus(); return; }
+  if (Number.isNaN(imp)){ avviso('Importo non valido (es. 1,30)'); $('#imp').focus(); return; }
+  if (!$('#data').value){ avviso('Manca la data'); $('#det').open = true; return; }
+  const campi = { data: $('#data').value, ora: $('#ora').value, conto, importo: imp, categoria,
+                  beneficiario: $('#ben').value.trim(), nota: $('#nota').value.trim() };
+  let id;
+  if (inModifica){
+    const i = coda.findIndex(s => s.id === inModifica);
+    if (i >= 0){ coda[i] = Object.assign({}, coda[i], campi); id = inModifica; }
+  }
+  if (!id){ id = nuovoId(new Date()); coda.push(Object.assign({id}, campi)); }
+  const eraModifica = !!inModifica;
+  scrivi(K.coda, coda); scrivi(K.ultimo, conto);
+  pulisciForm(); tutto();
+  avviso(`${eraModifica ? 'Modificata' : 'Aggiunta'}: ${fmt(imp)} € ${NOME_CONTO[conto]} · ${spezza(categoria).s}`,
+         eraModifica ? null : 'Annulla', () => elimina(id, true));
+}
+
+function modifica(id){
+  const s = coda.find(x => x.id === id); if (!s) return;
+  inModifica = id; conto = s.conto;
+  $('#imp').value = fmt(s.importo).replace(/\./g,'');
+  $('#data').value = s.data; $('#ora').value = s.ora || '';
+  $('#ben').value = s.beneficiario || ''; $('#nota').value = s.nota || '';
+  $('#editbar').classList.remove('hidden'); $('#det').open = true;
+  tutto(); window.scrollTo({top:0, behavior:'smooth'});
+  avviso('Cambia i campi e tocca la categoria per salvare');
+}
+
+function elimina(id, senzaConferma){
+  const s = coda.find(x => x.id === id); if (!s) return;
+  if (!senzaConferma && !confirm(`Eliminare ${fmt(s.importo)} € ${NOME_CONTO[s.conto]} · ${spezza(s.categoria).s}?`)) return;
+  coda = coda.filter(x => x.id !== id); scrivi(K.coda, coda);
+  if (inModifica === id) pulisciForm();
+  tutto();
+}
+
+function caricaElenchi(testo){
+  let e;
+  try { e = JSON.parse(testo); } catch(err){ avviso('JSON non valido'); return; }
+  if (!Array.isArray(e.categorie) || !e.categorie.length || !e.categorie.every(c => typeof c.nome === 'string')){
+    avviso('Mancano le categorie'); return;
+  }
+  e.beneficiari = Array.isArray(e.beneficiari) ? e.beneficiari.filter(b => typeof b.nome === 'string') : [];
+  delete e.prova; elenchi = e; scrivi(K.elenchi, e); $('#eljson').value = ''; tutto();
+  avviso('Elenchi caricati');
+}
+
+// ---------- eventi ----------
+document.querySelectorAll('.acc').forEach(b => b.onclick = () => { conto = b.dataset.c; tutteCat = false; $('#q').value=''; $('#q').classList.add('hidden'); tutto(); });
+['#data','#ora','#ben'].forEach(s => $(s).addEventListener('input', disegnaDettagli));
+$('#q').addEventListener('input', disegnaCategorie);
+$('#canceledit').onclick = () => { pulisciForm(); tutto(); };
+$('#elload').onclick = () => caricaElenchi($('#eljson').value);
+$('#send').onclick = () => avviso('L’invio a spese-dati arriva al passo 3. Le spese restano in coda.');
+$('#imp').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !inModifica && !$('#det').open) { adesso(); disegnaDettagli(); } });
+
+// ---------- avvio ----------
+$('#ver').textContent = 'Versione ' + VERSIONE;
+adesso(); tutto();
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
