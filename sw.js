@@ -1,5 +1,5 @@
 // Cache dell'app per l'uso offline. Cambiare VERSIONE a ogni rilascio.
-const VERSIONE = 'spese-0.1';
+const VERSIONE = 'spese-0.2';
 const FILE = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -13,5 +13,10 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;   // API GitHub: mai in cache
+  if (e.request.mode === 'navigate') {   // pagina: prima la rete (aggiornamenti subito), poi la cache (offline)
+    e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(VERSIONE).then(x => x.put('index.html', c)); return r; })
+      .catch(() => caches.match('index.html')));
+    return;
+  }
   e.respondWith(caches.match(e.request, {ignoreSearch: true}).then(r => r || fetch(e.request)));
 });

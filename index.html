@@ -121,8 +121,21 @@ textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border
   <div id="queue" class="queue"></div>
   <div id="totals" class="totals"></div>
 
+  <h2>Collegamento</h2>
+  <p class="note" id="stato"></p>
+  <details id="detcoll">
+    <summary><b>Token GitHub</b></summary>
+    <div style="padding:0 14px 14px">
+      <label><small>Token fine-grained con accesso solo a migliosa/spese-dati (Contents: read and write)</small>
+        <input id="token" type="password" autocomplete="off" placeholder="github_pat_..."></label>
+      <button class="btn pri" id="tokensave" style="width:100%;margin-top:8px">Salva e verifica</button>
+      <button class="btn sec" id="tokendel" style="width:100%;margin-top:8px">Togli il token da questo telefono</button>
+    </div>
+  </details>
+
   <h2>Elenchi</h2>
   <p class="note" id="elinfo"></p>
+  <button class="btn sec" id="elremote" style="width:100%;margin-bottom:8px">Aggiorna elenchi da spese-dati</button>
   <details>
     <summary><b>Carica elenchi da JSON</b></summary>
     <div style="padding:0 14px 14px">
@@ -140,10 +153,11 @@ textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border
 
 <script>
 'use strict';
-const VERSIONE = '0.1 (06/11/2026)';
+const VERSIONE = '0.2 (07/11/2026)';
+const REPO = 'migliosa/spese-dati';
 const CONTI = ['CASSA','FLASH'];
 const NOME_CONTO = {CASSA:'Cassa', FLASH:'FLASH'};
-const K = {coda:'spese.coda', elenchi:'spese.elenchi', ultimo:'spese.ultimoConto'};
+const K = {coda:'spese.coda', elenchi:'spese.elenchi', ultimo:'spese.ultimoConto', token:'spese.token', invio:'spese.ultimoInvio', elOra:'spese.elenchiCaricati'};
 
 // Elenchi di prova finche' non arriva elenchi.json da spese-dati (passo 2).
 const ELENCHI_PROVA = {
@@ -212,7 +226,12 @@ function disegnaCategorie(){
   const q = $('#q').value.trim().toLowerCase();
   let lista = categorieOrdinate();
   if (q) lista = lista.filter(c => c.nome.toLowerCase().includes(q));
-  else if (!tutteCat) lista = lista.filter(c => ((c.uso||{})[conto]||0) > 0).slice(0, 8);
+  else if (!tutteCat) {
+    lista = lista.filter(c => ((c.uso||{})[conto]||0) > 0).slice(0, 8);
+    const b = (elenchi.beneficiari||[]).find(x => x.nome === $('#ben').value.trim());
+    const pred = b && b.categoria && elenchi.categorie.find(c => c.nome === b.categoria);
+    if (pred) lista = [pred].concat(lista.filter(c => c !== pred)).slice(0, 8);
+  }
   const box = $('#cats'); box.innerHTML = '';
   for (const c of lista){
     const b = document.createElement('button'); b.className = 'cat';
@@ -332,30 +351,135 @@ function elimina(id, senzaConferma){
   tutto();
 }
 
-function caricaElenchi(testo){
+function caricaElenchi(testo, silenzioso){
   let e;
-  try { e = JSON.parse(testo); } catch(err){ avviso('JSON non valido'); return; }
+  if (typeof testo === 'object') e = testo;
+  else try { e = JSON.parse(testo); } catch(err){ avviso('JSON non valido'); return false; }
   if (!Array.isArray(e.categorie) || !e.categorie.length || !e.categorie.every(c => typeof c.nome === 'string')){
-    avviso('Mancano le categorie'); return;
+    avviso('Mancano le categorie'); return false;
   }
   e.beneficiari = Array.isArray(e.beneficiari) ? e.beneficiari.filter(b => typeof b.nome === 'string') : [];
-  delete e.prova; elenchi = e; scrivi(K.elenchi, e); $('#eljson').value = ''; tutto();
-  avviso('Elenchi caricati');
+  delete e.prova; elenchi = e; scrivi(K.elenchi, e); scrivi(K.elOra, Date.now()); $('#eljson').value = ''; tutto();
+  if (!silenzioso) avviso(`Elenchi caricati: ${e.categorie.length} categorie, ${e.beneficiari.length} beneficiari`);
+  return true;
+}
+
+// ---------- GitHub (solo il repo spese-dati) ----------
+function token(){ return leggi(K.token, ''); }
+async function gh(percorso, opz = {}){
+  const r = await fetch(`https://api.github.com/repos/${REPO}${percorso}`, Object.assign({cache:'no-store'}, opz, {
+    headers: Object.assign({'Authorization': 'Bearer ' + token(), 'Accept': 'application/vnd.github+json',
+                            'X-GitHub-Api-Version': '2022-11-28'}, opz.headers || {})}));
+  return r;
+}
+function daBase64(b){ const s = atob(b.replace(/\n/g,'')); const u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return new TextDecoder().decode(u); }
+function inBase64(t){ const u = new TextEncoder().encode(t); let s = '';
+  for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return btoa(s); }
+async function leggiFile(path){
+  const r = await gh('/contents/' + path);
+  if (r.status === 404) return {sha: null, dati: null};
+  if (!r.ok) throw new Error(`lettura ${path}: HTTP ${r.status}`);
+  const j = await r.json(); return {sha: j.sha, dati: JSON.parse(daBase64(j.content))};
+}
+async function scriviFile(path, dati, sha, messaggio){
+  const corpo = {message: messaggio, content: inBase64(JSON.stringify(dati, null, 1) + '\n')};
+  if (sha) corpo.sha = sha;
+  const r = await gh('/contents/' + path, {method: 'PUT', body: JSON.stringify(corpo)});
+  return r.status;
+}
+
+async function verificaToken(){
+  if (!token()){ $('#stato').textContent = 'Nessun token: le spese restano sul telefono.'; return false; }
+  try {
+    const r = await gh('');
+    if (r.status === 401){ $('#stato').textContent = 'Token non valido o scaduto: rifallo su GitHub.'; return false; }
+    if (r.status === 404){ $('#stato').textContent = `Il token non vede ${REPO}: controlla l'accesso al repo.`; return false; }
+    if (!r.ok){ $('#stato').textContent = `GitHub risponde HTTP ${r.status}.`; return false; }
+    const j = await r.json();
+    if (!j.permissions || !j.permissions.push){ $('#stato').textContent = 'Il token può leggere ma non scrivere: serve Contents read and write.'; return false; }
+    const u = leggi(K.invio, null);
+    $('#stato').textContent = `Collegato a ${REPO}.` + (u ? ` Ultimo invio ${u.quando}: ${u.n} ${u.n===1?'spesa':'spese'}.` : '');
+    return true;
+  } catch(err){ $('#stato').textContent = 'Senza rete: riprovo alla prossima apertura.'; return false; }
+}
+
+async function elenchiDaRemoto(silenzioso){
+  if (!token()){ if (!silenzioso) avviso('Prima il token'); return; }
+  try {
+    const f = await leggiFile('elenchi.json');
+    if (!f.dati){ if (!silenzioso) avviso('elenchi.json non c’è ancora in spese-dati'); return; }
+    caricaElenchi(f.dati, silenzioso);
+  } catch(err){ if (!silenzioso) avviso('Elenchi non letti: ' + err.message); }
+}
+
+let inviando = false;
+async function invia(){
+  if (inviando || !coda.length) return;
+  if (!token()){ avviso('Manca il token (Collegamento)'); $('#detcoll').open = true; return; }
+  if (elenchi.prova){ avviso('Carica prima gli elenchi veri da spese-dati'); return; }
+  const nomi = new Set(elenchi.categorie.map(c => c.nome));
+  const ignote = coda.filter(s => !nomi.has(s.categoria));
+  if (ignote.length){ avviso(`${ignote.length} spese con categoria non più in elenco: modificale`); return; }
+  if (!navigator.onLine){ avviso('Senza rete: le spese restano in coda'); return; }
+  inviando = true; $('#send').disabled = true; $('#send').textContent = 'Invio…';
+  const perMese = {};
+  coda.forEach(s => (perMese[s.data.slice(0,7)] = perMese[s.data.slice(0,7)] || []).push(s));
+  let inviate = 0, errore = null;
+  for (const [mese, spese] of Object.entries(perMese)){
+    const path = `spese/${mese}.json`;
+    let fatto = false;
+    for (let prova = 0; prova < 3 && !fatto; prova++){
+      try {
+        const f = await leggiFile(path);
+        const dati = f.dati || {spese: []};
+        const gia = new Set(dati.spese.map(x => x.id));
+        const nuove = spese.filter(x => !gia.has(x.id));
+        if (nuove.length){
+          dati.spese = dati.spese.concat(nuove.map(({id,data,ora,conto,importo,categoria,beneficiario,nota}) =>
+            ({id,data,ora,conto,importo,categoria,beneficiario,nota})));
+          const tot = nuove.reduce((a,x) => a + x.importo, 0);
+          const st = await scriviFile(path, dati, f.sha, `Spese ${mese}: +${nuove.length} (${fmt(tot)} €) dal telefono`);
+          if (st === 409 || st === 422) continue;            // file cambiato nel frattempo: rileggo
+          if (st !== 200 && st !== 201) throw new Error(`scrittura ${path}: HTTP ${st}`);
+        }
+        const ok = new Set(spese.map(x => x.id));
+        coda = coda.filter(x => !ok.has(x.id)); scrivi(K.coda, coda);
+        inviate += spese.length; fatto = true;
+      } catch(err){ errore = err.message; break; }
+    }
+    if (!fatto && !errore) errore = `${path} cambiava di continuo`;
+    if (errore) break;
+  }
+  inviando = false;
+  if (inviate) scrivi(K.invio, {quando: new Date().toLocaleString('it-IT',{dateStyle:'short',timeStyle:'short'}), n: inviate});
+  tutto(); verificaToken();
+  avviso(errore ? `Inviate ${inviate}, poi errore: ${errore}. Il resto è in coda.` : `Inviate ${inviate} ${inviate===1?'spesa':'spese'}`);
 }
 
 // ---------- eventi ----------
 document.querySelectorAll('.acc').forEach(b => b.onclick = () => { conto = b.dataset.c; tutteCat = false; $('#q').value=''; $('#q').classList.add('hidden'); tutto(); });
-['#data','#ora','#ben'].forEach(s => $(s).addEventListener('input', disegnaDettagli));
+['#data','#ora'].forEach(s => $(s).addEventListener('input', disegnaDettagli));
+$('#ben').addEventListener('input', () => { disegnaDettagli(); disegnaCategorie(); });
 $('#q').addEventListener('input', disegnaCategorie);
 $('#canceledit').onclick = () => { pulisciForm(); tutto(); };
 $('#elload').onclick = () => caricaElenchi($('#eljson').value);
-$('#send').onclick = () => avviso('L’invio a spese-dati arriva al passo 3. Le spese restano in coda.');
+$('#send').onclick = invia;
+$('#elremote').onclick = () => elenchiDaRemoto(false);
+$('#tokensave').onclick = async () => {
+  const t = $('#token').value.trim(); if (!t){ avviso('Incolla il token'); return; }
+  scrivi(K.token, t); $('#token').value = '';
+  if (await verificaToken()){ avviso('Token valido'); $('#detcoll').open = false; elenchiDaRemoto(false); }
+};
+$('#tokendel').onclick = () => { if (confirm('Togliere il token da questo telefono?')){ try{ localStorage.removeItem(K.token); }catch(e){} verificaToken(); } };
 $('#imp').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !inModifica && !$('#det').open) { adesso(); disegnaDettagli(); } });
 
 // ---------- avvio ----------
 $('#ver').textContent = 'Versione ' + VERSIONE;
-adesso(); tutto();
+adesso(); tutto(); verificaToken().then(ok => {
+  if (ok && (elenchi.prova || Date.now() - leggi(K.elOra, 0) > 86400000)) elenchiDaRemoto(true);
+});
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
