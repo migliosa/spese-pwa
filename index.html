@@ -153,7 +153,7 @@ textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border
 
 <script>
 'use strict';
-const VERSIONE = '0.3 (07/11/2026)';
+const VERSIONE = '0.4 (09/11/2026)';
 const REPO = 'migliosa/spese-dati';
 const CONTI = ['CASSA','FLASH'];
 const NOME_CONTO = {CASSA:'Cassa', FLASH:'FLASH'};
@@ -320,7 +320,7 @@ function aggiungi(categoria){
   if (Number.isNaN(imp)){ avviso('Importo non valido (es. 1,30)'); $('#imp').focus(); return; }
   if (!$('#data').value){ avviso('Manca la data'); $('#det').open = true; return; }
   const campi = { data: $('#data').value, ora: $('#ora').value, conto, importo: imp, categoria,
-                  beneficiario: $('#ben').value.trim(), nota: $('#nota').value.trim() };
+                  beneficiario: nomeBeneficiario($('#ben').value), nota: $('#nota').value.trim() };
   let id;
   if (inModifica){
     const i = coda.findIndex(s => s.id === inModifica);
@@ -330,8 +330,19 @@ function aggiungi(categoria){
   const eraModifica = !!inModifica;
   scrivi(K.coda, coda); scrivi(K.ultimo, conto);
   pulisciForm(); tutto();
-  avviso(`${eraModifica ? 'Modificata' : 'Aggiunta'}: ${fmt(imp)} € ${NOME_CONTO[conto]} · ${spezza(categoria).s}`,
+  const b = campi.beneficiario, nuovo = b && !(elenchi.beneficiari || []).some(x => x.nome === b);
+  avviso(`${eraModifica ? 'Modificata' : 'Aggiunta'}: ${fmt(imp)} € ${NOME_CONTO[conto]} · ${spezza(categoria).s} · ${b ? b + (nuovo ? ' (nuovo)' : '') : 'senza beneficiario'}`,
          eraModifica ? null : 'Annulla', () => elimina(id, true));
+}
+
+// "nobile" -> "NOBILE - Bar": stesso nome senza maiuscole, oppure un solo beneficiario che lo contiene
+function nomeBeneficiario(t){
+  t = (t || '').trim(); if (!t) return '';
+  const l = t.toLowerCase(), tutti = (elenchi.beneficiari || []).map(b => b.nome);
+  const esatto = tutti.find(n => n.toLowerCase() === l); if (esatto) return esatto;
+  const inizio = tutti.filter(n => n.toLowerCase().startsWith(l)); if (inizio.length === 1) return inizio[0];
+  const dentro = tutti.filter(n => n.toLowerCase().includes(l)); if (dentro.length === 1) return dentro[0];
+  return t;
 }
 
 function modifica(id){
