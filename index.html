@@ -136,13 +136,6 @@ textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border
   <h2>Elenchi</h2>
   <p class="note" id="elinfo"></p>
   <button class="btn sec" id="elremote" style="width:100%;margin-bottom:8px">Aggiorna elenchi da spese-dati</button>
-  <details>
-    <summary><b>Carica elenchi da JSON</b></summary>
-    <div style="padding:0 14px 14px">
-      <textarea id="eljson" placeholder='{"categorie":[...],"beneficiari":[...]}'></textarea>
-      <button class="btn sec" id="elload" style="width:100%;margin-top:8px">Carica</button>
-    </div>
-  </details>
   <p class="note" id="ver"></p>
 </main>
 
@@ -153,7 +146,7 @@ textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border
 
 <script>
 'use strict';
-const VERSIONE = '0.4 (09/11/2026)';
+const VERSIONE = '0.5 (15/11/2026)';
 const REPO = 'migliosa/spese-dati';
 const CONTI = ['CASSA','FLASH'];
 const NOME_CONTO = {CASSA:'Cassa', FLASH:'FLASH'};
@@ -294,7 +287,7 @@ function disegnaCoda(){
 
 function disegnaElenchi(){
   $('#elinfo').textContent = elenchi.prova
-    ? 'Elenchi di prova (le categorie più usate dal progetto). Quelli veri arrivano da spese-dati al passo 2.'
+    ? 'Elenchi di prova: metti il token in Collegamento per scaricare quelli veri da spese-dati.'
     : `${elenchi.categorie.length} categorie, ${(elenchi.beneficiari||[]).length} beneficiari` + (elenchi.generato ? ` · generati il ${elenchi.generato}` : '');
 }
 
@@ -380,7 +373,7 @@ function caricaElenchi(testo, silenzioso){
     const cand = e.categorie.filter(c => spezza(c.nome).s === sub);
     if (cand.length === 1){ sp.categoria = cand[0].nome; corrette++; }
   }
-  if (corrette){ scrivi(K.coda, coda); setTimeout(() => avviso(`${corrette} spese in coda aggiornate ai nomi nuovi`), 1500); } scrivi(K.elOra, Date.now()); $('#eljson').value = ''; tutto();
+  if (corrette){ scrivi(K.coda, coda); setTimeout(() => avviso(`${corrette} spese in coda aggiornate ai nomi nuovi`), 1500); } scrivi(K.elOra, Date.now()); tutto();
   if (!silenzioso) avviso(`Elenchi caricati: ${e.categorie.length} categorie, ${e.beneficiari.length} beneficiari`);
   return true;
 }
@@ -491,7 +484,6 @@ document.querySelectorAll('.acc').forEach(b => b.onclick = () => { conto = b.dat
 $('#ben').addEventListener('input', () => { disegnaDettagli(); disegnaCategorie(); });
 $('#q').addEventListener('input', disegnaCategorie);
 $('#canceledit').onclick = () => { pulisciForm(); tutto(); };
-$('#elload').onclick = () => caricaElenchi($('#eljson').value);
 $('#send').onclick = invia;
 $('#elremote').onclick = () => elenchiDaRemoto(false);
 $('#tokensave').onclick = async () => {
