@@ -57,8 +57,16 @@ label small{display:block;color:var(--muted);font-size:12px;margin:0 0 4px 2px}
 
 /* coda */
 .queue{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 14px;border-top:1px solid var(--line)}
+.row{position:relative;border-top:1px solid var(--line);background:var(--warn);touch-action:pan-y;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .row:first-child{border-top:0}
+.row .in{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 14px;background:var(--card);
+  position:relative;transition:transform .18s ease}
+.row.tira .in{transition:none}
+.row.premuta .in{background:var(--soft)}
+.row .dietro{position:absolute;right:16px;top:50%;transform:translateY(-50%);color:var(--card);font-weight:700;font-size:15px}
+.row.oltre .dietro{font-size:17px}
+.qhint{font-size:12px;color:var(--muted);margin:6px 2px 0}
 .row .imp{font-weight:650;font-variant-numeric:tabular-nums;text-align:right}
 .row .sub{grid-column:1/-1;font-size:13px;color:var(--muted)}
 .row .acts{grid-column:1/-1;display:flex;gap:14px;margin-top:4px}
@@ -76,13 +84,15 @@ label small{display:block;color:var(--muted);font-size:12px;margin:0 0 4px 2px}
 .bar .in{max-width:560px;margin:0 auto;display:flex;gap:10px}
 .btn{flex:1;padding:14px;border-radius:12px;font-weight:650;text-align:center}
 .btn.pri{background:var(--accent);color:var(--accent-ink)}
-.btn.sec{border:1px solid var(--line)}
+.btn.sec{background:var(--soft);color:var(--accent);border:1px solid var(--accent)}
+.btn:active{transform:scale(.98)}
 .btn:disabled,.btn.spento{opacity:.45}
 
-.toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;display:flex;gap:14px;align-items:center;
-  box-shadow:0 6px 20px rgba(0,0,0,.2);max-width:calc(100% - 32px)}
-.toast button{color:var(--bg);font-weight:700;text-decoration:underline}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));max-width:528px;margin:0 auto;
+  background:var(--card);color:var(--ink);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;
+  padding:12px 14px;font-size:15px;display:flex;gap:14px;align-items:center;justify-content:space-between;
+  box-shadow:0 4px 16px rgba(0,0,0,.25)}
+.toast button{flex:none;color:var(--accent);font-weight:700;padding:4px 8px;border:1px solid var(--accent);border-radius:8px}
 .editing{background:var(--soft);border-radius:10px;padding:8px 12px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:14px}
 .note{font-size:13px;color:var(--muted);margin:8px 2px}
 textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--card);color:var(--ink)}
@@ -119,6 +129,7 @@ textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border
 
   <h2>Da inviare</h2>
   <div id="queue" class="queue"></div>
+  <p id="qhint" class="qhint hidden">Per eliminare: trascina la spesa verso sinistra, oppure tienila premuta.</p>
   <div id="totals" class="totals"></div>
 
   <h2>Collegamento</h2>
@@ -135,7 +146,7 @@ textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border
 
   <h2>Elenchi</h2>
   <p class="note" id="elinfo"></p>
-  <button class="btn sec" id="elremote" style="width:100%;margin-bottom:8px">Aggiorna elenchi da spese-dati</button>
+  <button class="btn sec" id="elremote" style="width:100%;margin-bottom:8px">&#8635; Aggiorna categorie e beneficiari</button>
   <p class="note" id="ver"></p>
 </main>
 
@@ -146,7 +157,7 @@ textarea{width:100%;min-height:140px;font:13px/1.3 ui-monospace,monospace;border
 
 <script>
 'use strict';
-const VERSIONE = '0.5 (15/11/2026)';
+const VERSIONE = '0.6 (15/11/2026)';
 const REPO = 'migliosa/spese-dati';
 const CONTI = ['CASSA','FLASH'];
 const NOME_CONTO = {CASSA:'Cassa', FLASH:'FLASH'};
@@ -263,9 +274,9 @@ function disegnaCoda(){
   if (!coda.length){ box.innerHTML = '<div class="empty">Nessuna spesa in coda.</div>'; }
   for (const s of coda.slice().reverse()){
     const r = document.createElement('div'); r.className = 'row';
-    r.innerHTML = `<div><span class="tag"></span><span class="c"></span></div><div class="imp"></div>
+    r.innerHTML = `<span class="dietro">Elimina</span><div class="in"><div><span class="tag"></span><span class="c"></span></div><div class="imp"></div>
       <div class="sub"></div>
-      <div class="acts"><button class="ed">Modifica</button><button class="del">Elimina</button></div>`;
+      <div class="acts"><button class="ed">Modifica</button><button class="del">Elimina</button></div></div>`;
     r.querySelector('.tag').classList.add(s.conto);
     r.querySelector('.tag').textContent = NOME_CONTO[s.conto];
     r.querySelector('.c').textContent = spezza(s.categoria).s;
@@ -273,9 +284,11 @@ function disegnaCoda(){
     const extra = [s.data.split('-').reverse().join('/') + ' ' + (s.ora||''), s.beneficiario, s.nota].filter(Boolean).join(' · ');
     r.querySelector('.sub').textContent = extra;
     r.querySelector('.ed').onclick = () => modifica(s.id);
-    r.querySelector('.del').onclick = () => elimina(s.id);
+    r.querySelector('.del').onclick = () => chiediElimina(s.id);
+    gesti(r, s.id);
     box.appendChild(r);
   }
+  $('#qhint').classList.toggle('hidden', !coda.length);
   const tot = {}; coda.forEach(s => tot[s.conto] = (tot[s.conto]||0) + s.importo);
   $('#totals').textContent = coda.length
     ? `${coda.length} ${coda.length===1?'spesa':'spese'} · ` + CONTI.filter(c => tot[c]).map(c => `${NOME_CONTO[c]} ${fmt(tot[c])} €`).join(' · ')
@@ -355,6 +368,67 @@ function elimina(id, senzaConferma){
   coda = coda.filter(x => x.id !== id); scrivi(K.coda, coda);
   if (inModifica === id) pulisciForm();
   tutto();
+}
+
+function descr(s){ return `${fmt(s.importo)} € ${NOME_CONTO[s.conto]} · ${spezza(s.categoria).s}`; }
+
+// Elimina subito e offre "Annulla" (rimette la spesa dov'era)
+function eliminaConAnnulla(id){
+  const i = coda.findIndex(x => x.id === id); if (i < 0) return;
+  const s = coda[i];
+  coda.splice(i, 1); scrivi(K.coda, coda);
+  if (inModifica === id) pulisciForm();
+  tutto();
+  avviso('Eliminata: ' + descr(s), 'Annulla', () => {
+    if (coda.some(x => x.id === s.id)) return;
+    coda.splice(Math.min(i, coda.length), 0, s); scrivi(K.coda, coda); tutto();
+  });
+}
+function chiediElimina(id){
+  const s = coda.find(x => x.id === id); if (!s) return;
+  if (confirm('Eliminare ' + descr(s) + '?')) eliminaConAnnulla(id);
+}
+
+// Trascinamento a sinistra (oltre un terzo della riga) = elimina; pressione lunga = chiede se eliminare
+function gesti(r, id){
+  const inn = r.querySelector('.in');
+  let x0 = null, y0 = 0, dx = 0, oriz = false, timer = null;
+  const soglia = () => r.offsetWidth * 0.35;
+  const stop = () => { clearTimeout(timer); r.classList.remove('premuta'); };
+  r.addEventListener('contextmenu', e => e.preventDefault());
+  r.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    x0 = e.clientX; y0 = e.clientY; dx = 0; oriz = false;
+    r.classList.add('premuta');
+    timer = setTimeout(() => {
+      if (x0 === null || oriz) return;
+      x0 = null; r.classList.remove('premuta');
+      if (navigator.vibrate) navigator.vibrate(25);
+      chiediElimina(id);
+    }, 550);
+  });
+  r.addEventListener('pointermove', e => {
+    if (x0 === null) return;
+    const mx = e.clientX - x0, my = e.clientY - y0;
+    if (!oriz){
+      if (Math.abs(my) > 10){ stop(); x0 = null; return; }
+      if (mx < -10){ oriz = true; stop(); r.classList.add('tira'); try{ r.setPointerCapture(e.pointerId); }catch(_){} }
+      else return;
+    }
+    dx = Math.min(0, mx);
+    inn.style.transform = `translateX(${dx}px)`;
+    r.classList.toggle('oltre', -dx > soglia());
+  });
+  const fine = () => {
+    stop();
+    if (x0 === null) return;
+    x0 = null; r.classList.remove('tira');
+    if (oriz && -dx > soglia()){ inn.style.transform = 'translateX(-100%)'; setTimeout(() => eliminaConAnnulla(id), 180); }
+    else { inn.style.transform = ''; r.classList.remove('oltre'); }
+    oriz = false;
+  };
+  r.addEventListener('pointerup', fine);
+  r.addEventListener('pointercancel', fine);
 }
 
 function caricaElenchi(testo, silenzioso){
@@ -485,7 +559,11 @@ $('#ben').addEventListener('input', () => { disegnaDettagli(); disegnaCategorie(
 $('#q').addEventListener('input', disegnaCategorie);
 $('#canceledit').onclick = () => { pulisciForm(); tutto(); };
 $('#send').onclick = invia;
-$('#elremote').onclick = () => elenchiDaRemoto(false);
+$('#elremote').onclick = async () => {
+  const b = $('#elremote'); if (b.disabled) return;
+  b.disabled = true; b.textContent = 'Aggiornamento in corso…';
+  try { await elenchiDaRemoto(false); } finally { b.disabled = false; b.innerHTML = '&#8635; Aggiorna categorie e beneficiari'; }
+};
 $('#tokensave').onclick = async () => {
   const t = $('#token').value.trim(); if (!t){ avviso('Incolla il token'); return; }
   scrivi(K.token, t); $('#token').value = '';

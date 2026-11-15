@@ -1,5 +1,5 @@
 // Cache dell'app per l'uso offline. Cambiare VERSIONE a ogni rilascio.
-const VERSIONE = 'spese-0.5';
+const VERSIONE = 'spese-0.6';
 const FILE = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
